@@ -142,7 +142,7 @@ respectively."
 (defconst haml-here-doc-beg-re
   "\\(<\\)<\\(-\\)?\\(\\([a-zA-Z0-9_]+\\)\\|[\"]\\([^\"]+\\)[\"]\\|[']\\([^']+\\)[']\\)")
 
-(defconst ruby-here-doc-end-re
+(defconst haml-here-doc-end-re
   "^\\([ \t]+\\)?\\(.*\\)\\(.\\)$")
 
 (defconst haml-font-lock-syntactic-keywords
@@ -201,8 +201,8 @@ respectively."
   (modify-syntax-entry ?\[ "(]" haml-mode-syntax-table)
   (modify-syntax-entry ?\] ")[" haml-mode-syntax-table))
 
-(defvar ruby-font-lock-syntax-table
-    (let* ((tbl (copy-syntax-table ruby-mode-syntax-table)))
+(defvar haml-font-lock-syntax-table
+    (let* ((tbl (copy-syntax-table haml-mode-syntax-table)))
       (modify-syntax-entry ?_ "w" tbl)
       tbl))
 
