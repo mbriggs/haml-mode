@@ -131,14 +131,173 @@ respectively."
         ;; so we have to move the beginning back one char
         (font-lock-fontify-region (- beg 1) end)))))
 
+(defconst haml-keyword-end-re
+  (if (string-match "\\_>" "ruby")
+      "\\_>"
+    "\\>"))
+
+(defconst haml-here-doc-end-re
+  "^\\([ \t]+\\)?\\(.*\\)\\(.\\)$")
+
+(defconst haml-here-doc-beg-re
+  "\\(<\\)<\\(-\\)?\\(\\([a-zA-Z0-9_]+\\)\\|[\"]\\([^\"]+\\)[\"]\\|[']\\([^']+\\)[']\\)")
+
+(defconst ruby-here-doc-end-re
+  "^\\([ \t]+\\)?\\(.*\\)\\(.\\)$")
+
+(defconst haml-font-lock-syntactic-keywords
+        `(
+          ;; #{ }, #$hoge, #@foo are not comments
+          ("\\(#\\)[{$@]" 1 (1 . nil))
+          ;; the last $', $", $` in the respective string is not variable
+          ;; the last ?', ?", ?` in the respective string is not ascii code
+          ("\\(^\\|[\[ \t\n<+\(,=]\\)\\(['\"`]\\)\\(\\\\.\\|\\2\\|[^'\"`\n\\\\]\\)*?\\\\?[?$]\\(\\2\\)"
+           (2 (7 . nil))
+           (4 (7 . nil)))
+          ;; $' $" $` .... are variables
+          ;; ?' ?" ?` are ascii codes
+          ("\\(^\\|[^\\\\]\\)\\(\\\\\\\\\\)*[?$]\\([#\"'`]\\)" 3 (1 . nil))
+          ;; regexps
+          ("\\(^\\|[[=(,~?:;<>]\\|\\(^\\|\\s \\)\\(if\\|elsif\\|unless\\|while\\|until\\|when\\|and\\|or\\|&&\\|||\\)\\|g?sub!?\\|scan\\|split!?\\)\\s *\\(/\\)[^/\n\\\\]*\\(\\\\.[^/\n\\\\]*\\)*\\(/\\)"
+           (4 (7 . ?/))
+           (6 (7 . ?/)))
+          ("^\\(=\\)begin\\(\\s \\|$\\)" 1 (7 . nil))
+          ("^\\(=\\)end\\(\\s \\|$\\)" 1 (7 . nil))
+          (,(concat haml-here-doc-beg-re ".*\\(\n\\)")
+           ,(+ 1 (regexp-opt-depth haml-here-doc-beg-re))
+           (haml-here-doc-beg-syntax))
+          (,haml-here-doc-end-re 3 (haml-here-doc-end-syntax))))
+
+
+(defvar haml-mode-syntax-table nil
+  "Syntax table in use in ruby-mode buffers.")
+
+(if haml-mode-syntax-table ()
+  (setq haml-mode-syntax-table (make-syntax-table))
+  (modify-syntax-entry ?\' "\"" haml-mode-syntax-table)
+  (modify-syntax-entry ?\" "\"" haml-mode-syntax-table)
+  (modify-syntax-entry ?\` "\"" haml-mode-syntax-table)
+  (modify-syntax-entry ?# "<" haml-mode-syntax-table)
+  (modify-syntax-entry ?\n ">" haml-mode-syntax-table)
+  (modify-syntax-entry ?\\ "\\" haml-mode-syntax-table)
+  (modify-syntax-entry ?$ "." haml-mode-syntax-table)
+  (modify-syntax-entry ?? "_" haml-mode-syntax-table)
+  (modify-syntax-entry ?_ "_" haml-mode-syntax-table)
+  (modify-syntax-entry ?< "." haml-mode-syntax-table)
+  (modify-syntax-entry ?> "." haml-mode-syntax-table)
+  (modify-syntax-entry ?& "." haml-mode-syntax-table)
+  (modify-syntax-entry ?| "." haml-mode-syntax-table)
+  (modify-syntax-entry ?% "." haml-mode-syntax-table)
+  (modify-syntax-entry ?= "." haml-mode-syntax-table)
+  (modify-syntax-entry ?/ "." haml-mode-syntax-table)
+  (modify-syntax-entry ?+ "." haml-mode-syntax-table)
+  (modify-syntax-entry ?* "." haml-mode-syntax-table)
+  (modify-syntax-entry ?- "." haml-mode-syntax-table)
+  (modify-syntax-entry ?\; "." haml-mode-syntax-table)
+  (modify-syntax-entry ?\( "()" haml-mode-syntax-table)
+  (modify-syntax-entry ?\) ")(" haml-mode-syntax-table)
+  (modify-syntax-entry ?\{ "(}" haml-mode-syntax-table)
+  (modify-syntax-entry ?\} "){" haml-mode-syntax-table)
+  (modify-syntax-entry ?\[ "(]" haml-mode-syntax-table)
+  (modify-syntax-entry ?\] ")[" haml-mode-syntax-table))
+
+(defvar ruby-font-lock-syntax-table
+    (let* ((tbl (copy-syntax-table ruby-mode-syntax-table)))
+      (modify-syntax-entry ?_ "w" tbl)
+      tbl))
+
+
+(defconst haml-font-lock-keywords
+    (list
+     ;; functions
+     '("^\\s *def\\s +\\([^( \t\n]+\\)"
+       1 font-lock-function-name-face)
+     ;; keywords
+     (cons (concat
+            "\\(^\\|[^_:.@$]\\|\\.\\.\\)\\b\\(defined\\?\\|"
+            (regexp-opt
+             '("alias"
+               "and"
+               "begin"
+               "break"
+               "case"
+               "catch"
+               "class"
+               "def"
+               "do"
+               "elsif"
+               "else"
+               "fail"
+               "ensure"
+               "for"
+               "end"
+               "if"
+               "in"
+               "module"
+               "next"
+               "not"
+               "or"
+               "raise"
+               "redo"
+               "rescue"
+               "retry"
+               "return"
+               "then"
+               "throw"
+               "super"
+               "unless"
+               "undef"
+               "until"
+               "when"
+               "while"
+               "yield"
+               )
+             t)
+            "\\)"
+            haml-keyword-end-re)
+           2)
+     ;; here-doc beginnings
+     (list haml-here-doc-beg-re 0 'font-lock-string-face)
+     ;; variables
+     '("\\(^\\|[^_:.@$]\\|\\.\\.\\)\\b\\(nil\\|self\\|true\\|false\\)\\>"
+       2 font-lock-variable-name-face)
+     ;; variables
+     '("\\(\\$\\([^a-zA-Z0-9 \n]\\|[0-9]\\)\\)\\W"
+       1 font-lock-variable-name-face)
+     '("\\(\\$\\|@\\|@@\\)\\(\\w\\|_\\)+"
+       0 font-lock-variable-name-face)
+     ;; embedded document
+     '(ruby-font-lock-docs
+       0 font-lock-comment-face t)
+     '(ruby-font-lock-maybe-docs
+       0 font-lock-comment-face t)
+     ;; general delimited string
+     '("\\(^\\|[[ \t\n<+(,=]\\)\\(%[xrqQwW]?\\([^<[{(a-zA-Z0-9 \n]\\)[^\n\\\\]*\\(\\\\.[^\n\\\\]*\\)*\\(\\3\\)\\)"
+       (2 font-lock-string-face))
+     ;; constants
+     '("\\(^\\|[^_]\\)\\b\\([A-Z]+\\(\\w\\|_\\)*\\)"
+       2 font-lock-type-face)
+     ;; symbols
+     '("\\(^\\|[^:]\\)\\(:\\([-+~]@?\\|[/%&|^`]\\|\\*\\*?\\|<\\(<\\|=>?\\)?\\|>[>=]?\\|===?\\|=~\\|![~=]?\\|\\[\\]=?\\|\\(\\w\\|_\\)+\\([!?=]\\|\\b_*\\)\\|#{[^}\n\\\\]*\\(\\\\.[^}\n\\\\]*\\)*}\\)\\)"
+       2 font-lock-reference-face)
+     '("\\(^\\s *\\|[\[\{\(,]\\s *\\|\\sw\\s +\\)\\(\\(\\sw\\|_\\)+\\):[^:]" 2 font-lock-reference-face)
+     ;; expression expansion
+     '("#\\({[^}\n\\\\]*\\(\\\\.[^}\n\\\\]*\\)*}\\|\\(\\$\\|@\\|@@\\)\\(\\w\\|_\\)+\\)"
+       0 font-lock-variable-name-face t)
+     ;; warn lower camel case
+     ;'("\\<[a-z]+[a-z0-9]*[A-Z][A-Za-z0-9]*\\([!?]?\\|\\>\\)"
+     ;  0 font-lock-warning-face)
+     )
+    "*Additional expressions to highlight in ruby mode.")
+
 (defun haml-fontify-region-as-ruby (beg end)
   "Use Ruby's font-lock variables to fontify the region between BEG and END."
-  (haml-fontify-region beg end ruby-font-lock-keywords
-                       ruby-font-lock-syntax-table
-                       (when (boundp 'ruby-font-lock-syntactic-keywords)
-                         ruby-font-lock-syntactic-keywords)
-                       (when (fboundp 'ruby-syntax-propertize-function)
-                         #'ruby-syntax-propertize-function)))
+  (haml-fontify-region beg end haml-font-lock-keywords
+                       haml-font-lock-syntax-table
+                       (when (boundp 'haml-font-lock-syntactic-keywords)
+                         haml-font-lock-syntactic-keywords)
+                       (when (fboundp 'haml-syntax-propertize-function)
+                         #'haml-syntax-propertize-function)))
 
 (defun haml-handle-filter (filter-name limit fn)
   "If a FILTER-NAME filter is found within LIMIT, run FN on that filter.
